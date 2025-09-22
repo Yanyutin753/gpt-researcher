@@ -35,7 +35,7 @@ from backend.server.server_utils import (
 from backend.server.websocket_manager import run_agent
 from backend.utils import write_md_to_word, write_md_to_pdf
 from gpt_researcher.utils.logging_config import setup_research_logging
-from gpt_researcher.utils.enum import Tone
+from gpt_researcher.utils.enum import Tone, ReportType
 from backend.chat.chat import ChatAgentWithMemory
 
 import logging
@@ -198,6 +198,44 @@ def startup_event():
 # Routes
 
 
+def map_model_to_report_type(model: Optional[str], provided_report_type: Optional[str]) -> str:
+    """Map model name to a report type. Model hints take precedence.
+
+    Examples of model naming that influence report type:
+    - "*-multi*" -> "multi_agents"
+    - "*-detailed*" -> detailed_report
+    - "*-outline*" -> outline_report
+    - "*-resource*" -> resource_report
+    - "*-custom*" -> custom_report
+    - "*-subtopic*" -> subtopic_report
+    - "*-deep*" -> deep
+    Otherwise falls back to provided_report_type or research_report.
+    """
+    try:
+        model_normalized = (model or "").lower()
+
+        if "multi" in model_normalized:
+            return "multi_agents"
+        if "detailed" in model_normalized:
+            return ReportType.DetailedReport.value
+        if "outline" in model_normalized:
+            return ReportType.OutlineReport.value
+        if "resource" in model_normalized:
+            return ReportType.ResourceReport.value
+        if "custom" in model_normalized:
+            return ReportType.CustomReport.value
+        if "subtopic" in model_normalized:
+            return ReportType.SubtopicReport.value
+        if "deep" in model_normalized:
+            return ReportType.DeepResearch.value
+
+        # Fallback to provided
+        return provided_report_type or ReportType.ResearchReport.value
+    except Exception:
+        # Defensive fallback
+        return provided_report_type or ReportType.ResearchReport.value
+
+
 @app.get("/")
 async def read_root(request: Request):
     return templates.TemplateResponse(
@@ -347,7 +385,7 @@ async def chat_completions(request: ChatCompletionRequest):
                         choices=[
                             ChatCompletionStreamChoice(
                                 index=0,
-                                delta={"content": "🔍 开始研究任务...\n"},
+                                delta={"reasoning_content": "🔍 开始研究任务...\n", "content": ""},
                                 finish_reason=None,
                             )
                         ],
@@ -365,25 +403,24 @@ async def chat_completions(request: ChatCompletionRequest):
                         async def send_json(self, data):
                             message_type = data.get("type", "")
                             content = data.get("output", "") or data.get("content", "")
+                            report_content = ""
+                            reasoning_content = ""
 
                             logger.info(
                                 f"📨 收到消息: type={message_type}, content_len={len(content) if content else 0}"
                             )
 
-                            # Process all message types that contain useful content
                             if content:
-                                # Clean content - remove extra newlines and format properly
-                                clean_content = content.strip()
-                                if not clean_content:
-                                    return
-
-                                # For report type messages, add some spacing
-                                if message_type == "report":
-                                    clean_content = f"{clean_content}"
-                                elif message_type == "logs":
-                                    clean_content = f"{clean_content}\n"
-                                else:
-                                    clean_content = f"{clean_content}\n"
+                                match message_type:
+                                    case "report":
+                                        report_content = f"{content}"
+                                    case "logs":
+                                        reasoning_content = f"{content}"
+                                    case "images":
+                                        for i, image in enumerate(json.loads(content)):
+                                            print(f"![{i+1}]({image})\n")
+                                    case _:
+                                        report_content = f"{content}"
 
                                 chunk = ChatCompletionStreamResponse(
                                     id=completion_id_local,
@@ -392,7 +429,7 @@ async def chat_completions(request: ChatCompletionRequest):
                                     choices=[
                                         ChatCompletionStreamChoice(
                                             index=0,
-                                            delta={"content": clean_content},
+                                            delta={"content": report_content, "reasoning_content": reasoning_content},
                                             finish_reason=None,
                                         )
                                     ],
@@ -402,9 +439,6 @@ async def chat_completions(request: ChatCompletionRequest):
                                 # Use put_nowait to avoid blocking
                                 try:
                                     self.queue.put_nowait(chunk_data)
-                                    logger.debug(
-                                        f"✅ 已加入队列: {clean_content[:50]}..."
-                                    )
                                 except asyncio.QueueFull:
                                     logger.warning("⚠️ 队列已满，跳过消息")
                                 except Exception as e:
@@ -416,9 +450,12 @@ async def chat_completions(request: ChatCompletionRequest):
                     async def run_research():
                         try:
                             logger.info(f"🚀 开始研究任务: {task}")
+                            chosen_report_type = map_model_to_report_type(
+                                request.model, request.report_type
+                            )
                             final_report = await run_agent(
                                 task=task,
-                                report_type=request.report_type,
+                                report_type=chosen_report_type,
                                 report_source=request.report_source,
                                 source_urls=request.source_urls or [],
                                 document_urls=request.document_urls or [],
@@ -549,9 +586,12 @@ async def chat_completions(request: ChatCompletionRequest):
         else:
             try:
                 # Run research task
+                chosen_report_type = map_model_to_report_type(
+                    request.model, request.report_type
+                )
                 report = await run_agent(
                     task=task,
-                    report_type=request.report_type,
+                    report_type=chosen_report_type,
                     report_source=request.report_source,
                     source_urls=request.source_urls or [],
                     document_urls=request.document_urls or [],
@@ -605,6 +645,26 @@ async def chat_completions(request: ChatCompletionRequest):
             content={"error": {"message": str(e), "type": "server_error"}},
         )
 
+
+@app.get("/v1/models")
+async def models():
+    """
+    OpenAI-compatible Models API endpoint.
+    Supports both streaming and non-streaming responses.
+    """
+    models_list = [
+        {"id": "gpt-researcher", "object": "model"},
+        {"id": "gpt-researcher-detailed", "object": "model"},
+        {"id": "gpt-researcher-outline", "object": "model"},
+        {"id": "gpt-researcher-resource", "object": "model"},
+        {"id": "gpt-researcher-custom", "object": "model"},
+        {"id": "gpt-researcher-subtopic", "object": "model"},
+        {"id": "gpt-researcher-deep", "object": "model"},
+        {"id": "gpt-researcher-multi", "object": "model"},
+    ]
+    return JSONResponse(status_code=200, content={"data": models_list})
+    
+    
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

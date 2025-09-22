@@ -48,6 +48,10 @@ EXPOSE ${PORT}
 ARG WORKERS=1
 ENV WORKERS=${WORKERS}
 
+# Python runtime optimizations
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 # Create a non-root user for security
 # NOTE: Don't use this if you are relying on `_check_pkg` to pip install packages dynamically.
 RUN useradd -ms /bin/bash gpt-researcher && \
@@ -61,4 +65,9 @@ WORKDIR /usr/src/app
 
 # Copy the rest of the application files with proper ownership
 COPY --chown=gpt-researcher:gpt-researcher ./ ./
-CMD uvicorn main:app --host ${HOST} --port ${PORT} --workers ${WORKERS}
+
+# Healthcheck to ensure API is up (requires wget already installed in base layer)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:${PORT}/v1/models > /dev/null || exit 1
+
+CMD uvicorn main:app --host ${HOST} --port ${PORT} --workers ${WORKERS} --proxy-headers --forwarded-allow-ips "*"

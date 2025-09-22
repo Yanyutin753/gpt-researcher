@@ -59,13 +59,13 @@ class ReportGenerator:
             )
 
         context = ext_context or self.researcher.context
-        if self.researcher.verbose:
-            await stream_output(
-                "logs",
-                "writing_report",
-                f"✍️ Writing report for '{self.researcher.query}'...",
-                self.researcher.websocket,
-            )
+        # if self.researcher.verbose:
+        #     await stream_output(
+        #         "logs",
+        #         "writing_report",
+        #         f"✍️ Writing report for '{self.researcher.query}'...",
+        #         self.researcher.websocket,
+        #     )
 
         report_params = self.research_params.copy()
         report_params["context"] = context
@@ -128,7 +128,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "conclusion_written",
-                f"📝 Conclusion written for '{self.researcher.query}'",
+                f"\n📝 Conclusion written for '{self.researcher.query}'",
                 self.researcher.websocket,
             )
 
@@ -140,7 +140,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "writing_introduction",
-                f"✍️ Writing introduction for '{self.researcher.query}'...",
+                f"\n✍️ Writing introduction for '{self.researcher.query}'...",
                 self.researcher.websocket,
             )
 
@@ -159,7 +159,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "introduction_written",
-                f"📝 Introduction written for '{self.researcher.query}'",
+                f"\n📝 Introduction written for '{self.researcher.query}'",
                 self.researcher.websocket,
             )
 
@@ -171,7 +171,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "generating_subtopics",
-                f"🌳 Generating subtopics for '{self.researcher.query}'...",
+                f"\n🌳 Generating subtopics for '{self.researcher.query}'...",
                 self.researcher.websocket,
             )
 
@@ -188,7 +188,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "subtopics_generated",
-                f"📊 Subtopics generated for '{self.researcher.query}'",
+                f"\n📊 Subtopics generated for '{self.researcher.query}'",
                 self.researcher.websocket,
             )
 
@@ -200,7 +200,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "generating_draft_sections",
-                f"📑 Generating draft section titles for '{self.researcher.query}'...",
+                f"\n📑 Generating draft section titles for '{self.researcher.query}'...",
                 self.researcher.websocket,
             )
 
@@ -220,7 +220,7 @@ class ReportGenerator:
             await stream_output(
                 "logs",
                 "draft_sections_generated",
-                f"🗂️ Draft section titles generated for '{self.researcher.query}'",
+                f"\n🗂️ Draft section titles generated for '{self.researcher.query}'",
                 self.researcher.websocket,
             )
 

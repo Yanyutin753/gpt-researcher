@@ -26,7 +26,7 @@ class BrowserManager:
             await stream_output(
                 "logs",
                 "scraping_urls",
-                f"🌐 Scraping content from {len(urls)} URLs...",
+                f"\n🌐 Scraping content from {len(urls)} URLs...",
                 self.researcher.websocket,
             )
 
@@ -41,13 +41,13 @@ class BrowserManager:
             await stream_output(
                 "logs",
                 "scraping_content",
-                f"📄 Scraped {len(scraped_content)} pages of content",
+                f"\n📄 Scraped {len(scraped_content)} pages of content",
                 self.researcher.websocket,
             )
             await stream_output(
                 "logs",
                 "scraping_images",
-                f"🖼️ Selected {len(new_images)} new images from {len(images)} total images",
+                f"\n🖼️ Selected {len(new_images)} new images from {len(images)} total images",
                 self.researcher.websocket,
                 True,
                 new_images,
@@ -55,7 +55,7 @@ class BrowserManager:
             await stream_output(
                 "logs",
                 "scraping_complete",
-                f"🌐 Scraping complete",
+                f"\n🌐 Scraping complete",
                 self.researcher.websocket,
             )
 
