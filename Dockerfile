@@ -30,7 +30,6 @@ COPY ./multi_agents/requirements.txt ./multi_agents/requirements.txt
 
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir --prefer-binary -r requirements.txt \
-    && pip install --no-cache-dir --prefer-binary -r multi_agents/requirements.txt
 
 # Create non-root user and prepare writable dirs
 RUN useradd -ms /bin/bash gpt-researcher \
