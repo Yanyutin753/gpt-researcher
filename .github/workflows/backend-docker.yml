@@ -22,7 +22,7 @@ on:
       - 'main.py'
 
 env:
-  IMAGE_NAME: ${{ github.repository }}-backend
+  IMAGE_NAME: ${{ toLower(github.repository) }}-backend
 
 jobs:
   build-and-push:
@@ -51,7 +51,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}-backend
+          images: ghcr.io/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -77,11 +77,11 @@ jobs:
     steps:
       - name: Pull image
         run: |
-          docker pull ghcr.io/${{ github.repository }}-backend:sha-${{ github.sha }}
+          docker pull ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
 
       - name: Run container
         run: |
-          docker run -d --rm -p 8000:8000 --name gptr-backend ghcr.io/${{ github.repository }}-backend:sha-${{ github.sha }}
+          docker run -d --rm -p 8000:8000 --name gptr-backend ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
           sleep 12
 
       - name: Health check
