@@ -7,7 +7,7 @@ from ..actions import (
     generate_report,
     generate_draft_section_titles,
     write_report_introduction,
-    write_conclusion
+    write_conclusion,
 )
 
 
@@ -27,7 +27,13 @@ class ReportGenerator:
             "headers": self.researcher.headers,
         }
 
-    async def write_report(self, existing_headers: list = [], relevant_written_contents: list = [], ext_context=None, custom_prompt="") -> str:
+    async def write_report(
+        self,
+        existing_headers: list = [],
+        relevant_written_contents: list = [],
+        ext_context=None,
+        custom_prompt="",
+    ) -> str:
         """
         Write a report based on existing headers and relevant contents.
 
@@ -49,7 +55,7 @@ class ReportGenerator:
                 json.dumps(research_images),
                 self.researcher.websocket,
                 True,
-                research_images
+                research_images,
             )
 
         context = ext_context or self.researcher.context
@@ -66,24 +72,26 @@ class ReportGenerator:
         report_params["custom_prompt"] = custom_prompt
 
         if self.researcher.report_type == "subtopic_report":
-            report_params.update({
-                "main_topic": self.researcher.parent_query,
-                "existing_headers": existing_headers,
-                "relevant_written_contents": relevant_written_contents,
-                "cost_callback": self.researcher.add_costs,
-            })
+            report_params.update(
+                {
+                    "main_topic": self.researcher.parent_query,
+                    "existing_headers": existing_headers,
+                    "relevant_written_contents": relevant_written_contents,
+                    "cost_callback": self.researcher.add_costs,
+                }
+            )
         else:
             report_params["cost_callback"] = self.researcher.add_costs
 
         report = await generate_report(**report_params, **self.researcher.kwargs)
 
-        if self.researcher.verbose:
-            await stream_output(
-                "logs",
-                "report_written",
-                f"📝 Report written for '{self.researcher.query}'",
-                self.researcher.websocket,
-            )
+        # if self.researcher.verbose:
+        # await stream_output(
+        #     "logs",
+        #     "report_written",
+        #     f"📝 Report written for '{self.researcher.query}'",
+        #     self.researcher.websocket,
+        # )
 
         return report
 
@@ -113,7 +121,7 @@ class ReportGenerator:
             cost_callback=self.researcher.add_costs,
             websocket=self.researcher.websocket,
             prompt_family=self.researcher.prompt_family,
-            **self.researcher.kwargs
+            **self.researcher.kwargs,
         )
 
         if self.researcher.verbose:
@@ -144,7 +152,7 @@ class ReportGenerator:
             websocket=self.researcher.websocket,
             cost_callback=self.researcher.add_costs,
             prompt_family=self.researcher.prompt_family,
-            **self.researcher.kwargs
+            **self.researcher.kwargs,
         )
 
         if self.researcher.verbose:
@@ -173,7 +181,7 @@ class ReportGenerator:
             config=self.researcher.cfg,
             subtopics=self.researcher.subtopics,
             prompt_family=self.researcher.prompt_family,
-            **self.researcher.kwargs
+            **self.researcher.kwargs,
         )
 
         if self.researcher.verbose:
@@ -205,7 +213,7 @@ class ReportGenerator:
             config=self.researcher.cfg,
             cost_callback=self.researcher.add_costs,
             prompt_family=self.researcher.prompt_family,
-            **self.researcher.kwargs
+            **self.researcher.kwargs,
         )
 
         if self.researcher.verbose:
