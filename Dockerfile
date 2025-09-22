@@ -7,6 +7,11 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_ROOT_USER_ACTION=ignore \
     UVICORN_WORKERS=1
 
+# Ensure modern Rust toolchain locations are on PATH (set before install)
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
 WORKDIR /usr/src/app
 
 # System dependencies for building wheels and runtime libs
@@ -14,7 +19,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     build-essential \
     gcc g++ \
-    rustc cargo \
     git \
     wget curl ca-certificates \
     pkg-config \
@@ -23,6 +27,10 @@ RUN apt-get update \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install latest stable Rust via rustup to support modern Cargo.lock versions
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable \
+    && rustc --version && cargo --version
 
 # Separate layer for Python deps to leverage Docker cache
 COPY ./requirements.txt ./requirements.txt
