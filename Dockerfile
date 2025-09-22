@@ -28,10 +28,10 @@ RUN apt-get update \
 COPY ./requirements.txt ./requirements.txt
 
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir --prefer-binary -r requirements.txt \
+    && pip install --no-cache-dir --prefer-binary -r requirements.txt
 
-    # Create non-root user and prepare writable dirs
-    RUN useradd -ms /bin/bash gpt-researcher \
+# Create non-root user and prepare writable dirs
+RUN useradd -ms /bin/bash gpt-researcher \
     && mkdir -p /usr/src/app/outputs \
     && chown -R gpt-researcher:gpt-researcher /usr/src/app
 
@@ -53,4 +53,4 @@ EXPOSE ${PORT}
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
     CMD wget -qO- http://127.0.0.1:${PORT}/v1/models > /dev/null || exit 1
 
-CMD uvicorn main:app --host ${HOST} --port ${PORT} --workers ${WORKERS} --proxy-headers --forwarded-allow-ips "*"
+CMD ["sh","-c","uvicorn main:app --host ${HOST} --port ${PORT} --workers ${WORKERS} --proxy-headers --forwarded-allow-ips '*'" ]
