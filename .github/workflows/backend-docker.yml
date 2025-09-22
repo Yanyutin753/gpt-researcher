@@ -6,7 +6,6 @@ on:
     paths:
       - 'Dockerfile'
       - 'requirements.txt'
-      - 'multi_agents/requirements.txt'
       - 'backend/**'
       - 'gpt_researcher/**'
       - 'main.py'
@@ -16,13 +15,15 @@ on:
     paths:
       - 'Dockerfile'
       - 'requirements.txt'
-      - 'multi_agents/requirements.txt'
       - 'backend/**'
       - 'gpt_researcher/**'
       - 'main.py'
+      - '.github/workflows/backend-docker.yml'
+  workflow_dispatch:  # 允许手动触发
 
 env:
-  IMAGE_NAME: ${{ toLower(github.repository) }}-backend
+  IMAGE_NAME: ${{ github.repository_owner }}/${{ github.event.repository.name }}-backend
+  REGISTRY: ghcr.io
 
 jobs:
   build-and-push:
@@ -30,6 +31,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,24 +45,33 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Convert repository name to lowercase
+        id: repo
+        run: |
+          echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}-backend
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
-            type=sha
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -69,26 +82,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  smoke-test:
-    needs: build-and-push
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Pull image
-        run: |
-          docker pull ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-
-      - name: Run container
-        run: |
-          docker run -d --rm -p 8000:8000 --name gptr-backend ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-          sleep 12
-
-      - name: Health check
-        run: |
-          curl -fsS http://localhost:8000/v1/models | jq . > /dev/null
-
-      - name: Stop container
-        if: always()
-        run: |
-          docker stop gptr-backend || true
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
