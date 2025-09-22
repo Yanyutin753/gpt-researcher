@@ -16,9 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def read_root():
     return {"message": "Welcome to GPT Researcher"}
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

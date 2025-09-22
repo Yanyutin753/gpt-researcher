@@ -24,7 +24,7 @@ async def create_chat_completion(
         messages: list[dict[str, str]],
         model: str | None = None,
         temperature: float | None = 0.4,
-        max_tokens: int | None = 4000,
+        max_tokens: int | None = 16384,
         llm_provider: str | None = None,
         stream: bool = False,
         websocket: Any | None = None,

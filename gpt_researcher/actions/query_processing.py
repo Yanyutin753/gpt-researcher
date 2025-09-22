@@ -68,6 +68,10 @@ async def generate_sub_queries(
         context=context,
     )
 
+    # Filter kwargs to only include valid parameters for create_chat_completion
+    filtered_kwargs = {k: v for k, v in kwargs.items() 
+                      if k not in ['max_iterations', 'report_type', 'parent_query']}
+    
     try:
         response = await create_chat_completion(
             model=cfg.strategic_llm_model,
@@ -77,7 +81,7 @@ async def generate_sub_queries(
             llm_kwargs=cfg.llm_kwargs,
             reasoning_effort=ReasoningEfforts.Medium.value,
             cost_callback=cost_callback,
-            **kwargs
+            **filtered_kwargs
         )
     except Exception as e:
         logger.warning(f"Error with strategic LLM: {e}. Retrying with max_tokens={cfg.strategic_token_limit}.")
@@ -90,7 +94,7 @@ async def generate_sub_queries(
                 llm_provider=cfg.strategic_llm_provider,
                 llm_kwargs=cfg.llm_kwargs,
                 cost_callback=cost_callback,
-                **kwargs
+                **filtered_kwargs
             )
             logger.warning(f"Retrying with max_tokens={cfg.strategic_token_limit} successful.")
         except Exception as e:
@@ -104,7 +108,7 @@ async def generate_sub_queries(
                 llm_provider=cfg.smart_llm_provider,
                 llm_kwargs=cfg.llm_kwargs,
                 cost_callback=cost_callback,
-                **kwargs
+                **filtered_kwargs
             )
 
     return json_repair.loads(response)
