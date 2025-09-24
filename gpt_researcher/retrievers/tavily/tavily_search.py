@@ -2,7 +2,7 @@
 
 # libraries
 import os
-from typing import Literal, Sequence, Optional
+from typing import Literal, Sequence
 import requests
 import json
 
@@ -26,27 +26,52 @@ class TavilySearch:
         self.headers = headers or {}
         self.topic = topic
         self.base_url = "https://api.tavily.com/search"
-        self.api_key = self.get_api_key()
+        self.api_keys = self.get_api_keys()
+        self.api_key_index = 0
         self.headers = {
             "Content-Type": "application/json",
         }
         self.query_domains = query_domains or None
 
-    def get_api_key(self):
+    def get_api_keys(self):
         """
-        Gets the Tavily API key
+        Gets the Tavily API keys (supports multiple keys separated by comma)
         Returns:
-
+            list: List of API keys for round-robin polling
         """
-        api_key = self.headers.get("tavily_api_key")
-        if not api_key:
-            try:
-                api_key = os.environ["TAVILY_API_KEY"]
-            except KeyError:
-                print(
-                    "Tavily API key not found, set to blank. If you need a retriver, please set the TAVILY_API_KEY environment variable."
-                )
-                return ""
+        # First check headers for api key(s)
+        api_keys_str = self.headers.get("tavily_api_key", "")
+        
+        # If not in headers, check environment variable
+        if not api_keys_str:
+            api_keys_str = os.environ.get("TAVILY_API_KEY", "")
+        
+        if not api_keys_str:
+            print(
+                "Tavily API key not found, set to blank. If you need a retriver, please set the TAVILY_API_KEY environment variable."
+            )
+            return [""]
+        
+        # Split by comma and strip whitespace
+        api_keys = [key.strip() for key in api_keys_str.split(',') if key.strip()]
+        
+        if not api_keys:
+            return [""]
+        
+        print(f"Loaded {len(api_keys)} Tavily API key(s)")
+        return api_keys
+    
+    def get_next_api_key(self):
+        """
+        Get the next API key using round-robin polling
+        Returns:
+            str: The next API key in rotation
+        """
+        if not self.api_keys:
+            return ""
+        
+        api_key = self.api_keys[self.api_key_index]
+        self.api_key_index = (self.api_key_index + 1) % len(self.api_keys)
         return api_key
 
 
@@ -66,32 +91,56 @@ class TavilySearch:
     ) -> dict:
         """
         Internal search method to send the request to the API.
+        Uses round-robin polling for multiple API keys.
         """
+        # Try each API key in rotation until one succeeds or all fail
+        errors = []
+        for attempt in range(len(self.api_keys)):
+            api_key = self.get_next_api_key()
+            
+            if not api_key:
+                continue
+                
+            data = {
+                "query": query,
+                "search_depth": search_depth,
+                "topic": topic,
+                "days": days,
+                "include_answer": include_answer,
+                "include_raw_content": include_raw_content,
+                "max_results": max_results,
+                "include_domains": include_domains,
+                "exclude_domains": exclude_domains,
+                "include_images": include_images,
+                "api_key": api_key,
+                "use_cache": use_cache,
+            }
 
-        data = {
-            "query": query,
-            "search_depth": search_depth,
-            "topic": topic,
-            "days": days,
-            "include_answer": include_answer,
-            "include_raw_content": include_raw_content,
-            "max_results": max_results,
-            "include_domains": include_domains,
-            "exclude_domains": exclude_domains,
-            "include_images": include_images,
-            "api_key": self.api_key,
-            "use_cache": use_cache,
-        }
+            try:
+                response = requests.post(
+                    self.base_url, data=json.dumps(data), headers=self.headers, timeout=100
+                )
 
-        response = requests.post(
-            self.base_url, data=json.dumps(data), headers=self.headers, timeout=100
-        )
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            # Raises a HTTPError if the HTTP request returned an unsuccessful status code
-            response.raise_for_status()
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    # Store error for this API key
+                    errors.append(f"API key {attempt + 1}: HTTP {response.status_code}")
+                    if response.status_code == 401 or response.status_code == 403:
+                        # Invalid API key, try next one
+                        print(f"API key {attempt + 1} failed with status {response.status_code}, trying next key...")
+                        continue
+                    else:
+                        # Other error, might be worth retrying with same key
+                        response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                errors.append(f"API key {attempt + 1}: {str(e)}")
+                print(f"Request failed with API key {attempt + 1}: {e}")
+                continue
+        
+        # If all API keys failed, raise an error with all attempts
+        error_msg = "All API keys failed. Errors: " + "; ".join(errors)
+        raise Exception(error_msg)
 
     def search(self, max_results=10):
         """

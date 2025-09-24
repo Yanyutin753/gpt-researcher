@@ -68,7 +68,7 @@ class ResearchRequest(BaseModel):
 
 class ConfigRequest(BaseModel):
     ANTHROPIC_API_KEY: str
-    TAVILY_API_KEY: str
+    TAVILY_API_KEY: str  # Supports comma-separated multiple keys
     LANGCHAIN_TRACING_V2: str
     LANGCHAIN_API_KEY: str
     OPENAI_API_KEY: str
